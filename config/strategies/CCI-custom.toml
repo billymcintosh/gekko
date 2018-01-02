@@ -1,0 +1,17 @@
+# constant multiplier. 0.015 gets to around 70% fit
+constant = 0.015
+
+# history size, make same or smaller than history
+history = 90
+
+# safety mode 1 = on, 0 = off
+# safety is not to sell unless below profit margin is met on the individual trade
+safety = 1
+
+# minimum profit, percentage expressed as decimal, eg 0.05 = 5%
+minProfit = 0.05
+
+[thresholds]
+up = 100
+down = -100
+persistence = 0
