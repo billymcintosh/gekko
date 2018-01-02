@@ -12,7 +12,7 @@
 var _ = require('lodash');
 var util = require('../../core/util');
 var dirs = util.dirs();
-var events = require("events");
+var events = require('events');
 var log = require(dirs.core + 'log');
 var async = require('async');
 var checker = require(dirs.core + 'exchangeChecker.js');
@@ -43,11 +43,38 @@ var Manager = function(conf) {
 
   this.currency = conf.currency;
   this.asset = conf.asset;
+  this.portfolioMode = conf.mode;
   this.keepAsset = 0;
+  this.useAsset = 0;
+  this.percentAsset = 0;
 
-  if(_.isNumber(conf.keepAsset)) {
-    log.debug('Keep asset is active. Will try to keep at least ' + conf.keepAsset + ' ' + conf.asset);
-    this.keepAsset = conf.keepAsset;
+  if(_.isString(this.portfolioMode)) {
+    if(this.portfolioMode.toLowerCase() == 'keep' && _.isNumber(conf.keepAsset)) {
+      this.keepAsset = conf.keepAsset;
+      log.info('Keep asset mode is active. Will keep at least ' + this.keepAsset + ' ' + conf.asset);
+    } else if (this.portfolioMode.toLowerCase() == 'use' && _.isNumber(conf.useAsset)) {
+      this.useAsset = conf.useAsset;
+      log.info('Use asset mode is active. Will only trade with a maximum of ' + this.useAsset + ' ' + conf.asset);
+    } else if (this.portfolioMode.toLowerCase() == 'percent' && _.isNumber(conf.percentAsset)) {
+      if(conf.percentAsset > 1 || conf.percentAsset < 0) {
+        this.percentAsset = 0.5;
+        log.info('config.percentAsset is invalid.  Value must be between 0.0 and 1.0, defaulting to 50% of ' + conf.asset);
+      } else {
+        this.percentAsset = conf.percentAsset;
+      }
+      log.info('Percentage asset mode is active. Will only trade with ' + this.percentAsset * 100 + '% of ' + conf.asset);
+    } else if (this.portfolioMode.toLowerCase() == 'full') {
+      log.info('Full portfolio mode is active.  Using all available ' + conf.asset + ' for trading.');
+    } else {
+      log.info('Portfolio Mode was set to ' + this.portfolioMode.toUppserCase());
+      log.info('Either this is not a valid mode or no matching asset restriction item was found.');
+      log.info('Using full portfolio of ' + conf.asset + ' for trading, no restriction is set.');
+      this.portfolioMode = 'full';
+    }
+  } else {
+    log.info('No portfolio management mode set.');
+    log.info('Using full portfolio of ' + conf.asset + ' for trading, no restriction is set.');
+    this.portfolioMode = 'full';
   }
 
   // resets after every order
@@ -65,6 +92,8 @@ Manager.prototype.init = function(callback) {
     log.info('trading at', this.exchange.name, 'ACTIVE');
     log.info(this.exchange.name, 'trading fee will be:', this.fee * 100 + '%');
     this.logPortfolio();
+
+    this.getBalance(this.conf.asset);
 
     callback();
   };
@@ -138,7 +167,28 @@ Manager.prototype.getFund = function(fund) {
   return _.find(this.portfolio, function(f) { return f.name === fund});
 };
 Manager.prototype.getBalance = function(fund) {
-  return this.getFund(fund).amount;
+  this.total = this.getFund(fund).amount;
+  this.tradable = 0;
+  if (fund == this.asset) {
+    if(this.portfolioMode == 'keep') {
+      this.tradable = this.total - this.keepAsset;
+    } else if (this.portfolioMode == 'use') {
+      if (this.total > this.useAsset) {
+        this.tradable = this.useAsset;
+      } else {
+        this.tradable = this.total;
+      }
+    } else if (this.portfolioMode == 'percent') {
+      this.tradable = this.total * this.percentAsset;
+    } else {
+      this.tradable = this.total;
+    }
+    log.info('Total', this.asset, 'available:', parseFloat(this.total).toFixed(8));
+    log.info('Trading with:', parseFloat(this.tradable).toFixed(8));
+  } else {
+    this.tradable = this.total;
+  }
+  return this.tradable;
 };
 
 // This function makes sure the limit order gets submitted
@@ -163,7 +213,7 @@ Manager.prototype.trade = function(what, retry) {
       }
     } else if(what === 'SELL') {
 
-      amount = this.getBalance(this.asset) - this.keepAsset;
+      amount = this.getBalance(this.asset);
       if(amount > 0){
           price = this.ticker.ask;
           this.sell(amount, price);
@@ -189,62 +239,80 @@ Manager.prototype.getMinimum = function(price) {
 // the asset, if so BUY and keep track of the order
 // (amount is in asset quantity)
 Manager.prototype.buy = function(amount, price) {
+  let minimum = 0;
+  let process = (err, order) => {
+    // if order to small
+    if(!order.amount || order.amount < minimum) {
+      return log.warn(
+        'Wanted to buy',
+        this.asset,
+        'but the amount is too small ',
+        '(' + parseFloat(amount).toFixed(8) + ' @',
+        parseFloat(price).toFixed(8),
+        ') at',
+        this.exchange.name
+      );
+    }
 
-  var minimum = this.getMinimum(price);
-
-  // if order to small
-  if(amount < minimum) {
-    return log.error(
-      'Wanted to buy',
+    log.info(
+      'Attempting to BUY',
+      order.amount,
       this.asset,
-      'but the amount is too small',
-      '(' + parseFloat(amount).toFixed(12) + ')',
       'at',
-      this.exchange.name
+      this.exchange.name,
+      'price:',
+      order.price
     );
+
+    this.exchange.buy(order.amount, order.price, this.noteOrder);
   }
 
-  log.info(
-    'Attempting to BUY',
-    amount,
-    this.asset,
-    'at',
-    this.exchange.name,
-    'price:',
-    price
-  );
-  this.exchange.buy(amount, price, this.noteOrder);
+  if (_.has(this.exchange, 'getLotSize')) {
+    this.exchange.getLotSize('buy', amount, price, _.bind(process));
+  } else {
+    minimum = this.getMinimum(price);
+    process(undefined, { amount: amount, price: price });
+  }
 };
 
 // first do a quick check to see whether we can sell
 // the asset, if so SELL and keep track of the order
 // (amount is in asset quantity)
 Manager.prototype.sell = function(amount, price) {
+  let minimum = 0;
+  let process = (err, order) => {
+    // if order to small
+    if (!order.amount || order.amount < minimum) {
+      return log.warn(
+        'Wanted to buy',
+        this.currency,
+        'but the amount is too small ',
+        '(' + parseFloat(amount).toFixed(8) + ' @',
+        parseFloat(price).toFixed(8),
+        ') at',
+        this.exchange.name
+      );
+    }
 
-  var minimum = this.getMinimum(price);
-
-  // if order to small
-  if(amount < minimum) {
-    return log.error(
-      'Wanted to buy',
-      this.currency,
-      'but the amount is too small',
-      '(' + parseFloat(amount).toFixed(12) + ')',
+    log.info(
+      'Attempting to SELL',
+      order.amount,
+      this.asset,
       'at',
-      this.exchange.name
+      this.exchange.name,
+      'price:',
+      order.price
     );
+
+    this.exchange.sell(order.amount, order.price, this.noteOrder);
   }
 
-  log.info(
-    'Attempting to SELL',
-    amount,
-    this.asset,
-    'at',
-    this.exchange.name,
-    'price:',
-    price
-  );
-  this.exchange.sell(amount, price, this.noteOrder);
+  if (_.has(this.exchange, 'getLotSize')) {
+    this.exchange.getLotSize('sell', amount, price, _.bind(process));
+  } else {
+    minimum = this.getMinimum(price);
+    process(undefined, { amount: amount, price: price });
+  }
 };
 
 Manager.prototype.noteOrder = function(err, order) {

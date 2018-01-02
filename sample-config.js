@@ -23,7 +23,19 @@ config.watch = {
   // You can set your own tickrate (refresh rate).
   // If you don't set it, the defaults are 2 sec for
   // okcoin and 20 sec for all other exchanges.
-  // tickrate: 20
+  // tickrate: 20,
+
+  // You can set a portfolio management mode here
+  // Default is to trade with 100% of available asset
+  // Valid modes are:
+  //  full (default) - use all available funds for trading
+  //  keep - keep X amount of asset at all times - requires a defined value for keepAsset
+  //  use - only use X amount of asset for trading - requires a defined value for useAsset
+  //  percent - use X percent of available asset for trading - requires a defined value (in decimal) for percentAsset
+  mode: 'full',
+  //keepAsset: 0,
+  //useAsset: 0,
+  //percentAsset: 0,
 }
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
