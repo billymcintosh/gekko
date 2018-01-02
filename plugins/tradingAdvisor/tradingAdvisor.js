@@ -79,6 +79,10 @@ Actor.prototype.processCustomCandle = function(candle) {
   this.method.tick(candle);
 }
 
+Actor.prototype.processTrade = function(trade) {
+  this.method.onTrade(trade);
+}
+
 // pass through shutdown handler
 Actor.prototype.finish = function(done) {
   this.method.finish(done);
@@ -88,6 +92,5 @@ Actor.prototype.finish = function(done) {
 Actor.prototype.relayAdvice = function(advice) {
   this.emit('advice', advice);
 }
-
 
 module.exports = Actor;

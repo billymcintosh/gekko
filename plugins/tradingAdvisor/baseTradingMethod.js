@@ -77,6 +77,9 @@ var Base = function(settings) {
   if(!this.update)
     this.update = function() {};
 
+  if(!this.onTrade)
+    this.onTrade = function() {};
+
   if(!this.end)
     this.end = function() {};
 
@@ -321,6 +324,12 @@ Base.prototype.advice = function(newPosition, _candle) {
       candle
     });
   }.bind(this));
+}
+
+Base.prototype.onTrade = function(trade) {
+  this.trade = trade;
+
+  this.onTrade(trade);
 }
 
 // Because the trading method might be async we need
