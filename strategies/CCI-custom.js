@@ -1,7 +1,6 @@
 // helpers
 var _ = require('lodash');
 var log = require('../core/log.js');
-var trader = require('../plugins/trader/trader.js');
 
 // let's create our own method
 var method = {};
@@ -60,6 +59,11 @@ method.init = function() {
 }
 
 method.update = function(candle) {
+}
+
+method.onPortfolio = function(portfolio) {
+  log.info('Current Asset Holding:', portfolio.asset);
+  log.info('Current Currency Holding:', portfolio.currency);
 }
 
 // what happens on every new trade?

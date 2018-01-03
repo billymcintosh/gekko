@@ -79,8 +79,14 @@ Actor.prototype.processCustomCandle = function(candle) {
   this.method.tick(candle);
 }
 
+// propogate trade data to the trading method
 Actor.prototype.processTrade = function(trade) {
   this.method.onTrade(trade);
+}
+
+// propogate portfolip data to the trading method
+Actor.prototype.processPortfolioUpdate = function(portfolio) {
+  this.method.onPortfolio(portfolio);
 }
 
 // pass through shutdown handler

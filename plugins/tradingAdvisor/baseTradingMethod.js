@@ -80,6 +80,9 @@ var Base = function(settings) {
   if(!this.onTrade)
     this.onTrade = function() {};
 
+  if(!this.onPortfolio)
+    this.onPortfolio = function() {};
+
   if(!this.end)
     this.end = function() {};
 
@@ -330,6 +333,12 @@ Base.prototype.onTrade = function(trade) {
   this.trade = trade;
 
   this.onTrade(trade);
+}
+
+Base.prototype.onPortfolio = function(portfolio) {
+  this.portfolio = portfolio;
+
+  this.onPortfolio(portfolio);
 }
 
 // Because the trading method might be async we need
