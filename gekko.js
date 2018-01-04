@@ -59,3 +59,7 @@ pipeline({
   mode: mode
 });
 
+process.on('unhandledRejection', (reason, p) => {
+  console.log(`Unhandled Rejection at: ${p}, Reason: ${reason}`);
+  // application specific logging, throwing an error, or other logic here
+});
