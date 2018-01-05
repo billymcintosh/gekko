@@ -32,6 +32,7 @@ console.log(`
    $$$$$$/  $$$$$$$$/ $$/   $$/ $$/   $$/  $$$$$$/
 `);
 
+const log = require(__dirname + '/core/log');
 const util = require(__dirname + '/core/util');
 
 console.log('\tGekko v' + util.getVersion());
@@ -60,7 +61,6 @@ pipeline({
 });
 
 process.on('unhandledRejection', (reason, p) => {
-  console.log(`Unhandled Rejection at: Promise: ${p}, 'Reason: ${reason}`);
-  // could potentially handle it or exit here
+  log.error(`Unhandled Rejection at: ${p}, Reason: ${reason}`);
+  // application specific logging, throwing an error, or other logic here
 });
-
